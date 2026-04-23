@@ -1,0 +1,52 @@
+{
+  "models": [
+    {
+      "id": "tinyllama-1.1b-chat-q4",
+      "name": "TinyLLaMA 1.1B Chat",
+      "description": "Ultra-fast, very low RAM. Best for basic chat on budget devices.",
+      "sizeBytes": 669000000,
+      "url": "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_TINYLLAMA",
+      "filename": "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+      "capabilities": { "vision": false },
+      "inferenceDefaults": {
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "max_tokens": 512,
+        "context_length": 2048
+      }
+    },
+    {
+      "id": "phi-2-q4",
+      "name": "Phi-2 2.7B",
+      "description": "Microsoft Phi-2. Exceptional quality for its size. Great for mid-range devices.",
+      "sizeBytes": 1700000000,
+      "url": "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_PHI2",
+      "filename": "phi-2.Q4_K_M.gguf",
+      "capabilities": { "vision": false },
+      "inferenceDefaults": {
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "max_tokens": 1024,
+        "context_length": 2048
+      }
+    },
+    {
+      "id": "mistral-7b-q4",
+      "name": "Mistral 7B Instruct",
+      "description": "State of the art 7B model. Best quality. Requires 6GB+ RAM.",
+      "sizeBytes": 4100000000,
+      "url": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+      "sha256": "PLACEHOLDER_SHA256_MISTRAL",
+      "filename": "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
+      "capabilities": { "vision": false },
+      "inferenceDefaults": {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 2048,
+        "context_length": 4096
+      }
+    }
+  ]
+}
