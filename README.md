@@ -1,97 +1,237 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# PocketAI — Offline AI Chat App
 
-# Getting Started
+> Run large language models entirely on your Android device. No cloud. No tracking. No internet required during inference.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## Prerequisites
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+| Tool | Version |
+|---|---|
+| Node.js | ≥ 22.11.0 |
+| JDK | 17 (recommended) |
+| Android Studio | Hedgehog or later |
+| React Native CLI | 20.x |
+| Android NDK | r26+ (for llama.rn) |
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
-npm start
+## Installation
 
-# OR using Yarn
-yarn start
+```bash
+# 1. Clone and enter the project
+cd PocketAI
+
+# 2. Install Node dependencies
+npm install
+
+# 3. Android — configure NDK for llama.rn
+# See "Android Build Configuration" section below
+
+# 4. Run on Android
+npx react-native run-android
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## Android Build Configuration (`android/app/build.gradle`)
 
-### Android
+`llama.rn` requires native C++ compilation. Add these changes:
 
-```sh
-# Using npm
-npm run android
+```groovy
+android {
+    // ...
+    defaultConfig {
+        // ...
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17"
+                abiFilters "arm64-v8a", "x86_64"
+            }
+        }
+    }
 
-# OR using Yarn
-yarn android
+    externalNativeBuild {
+        cmake {
+            path "../../node_modules/llama.rn/android/CMakeLists.txt"
+        }
+    }
+
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+    }
+}
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+Also ensure NDK is configured in `local.properties`:
+```
+ndk.dir=/path/to/android/sdk/ndk/26.x.x
 ```
 
-Then, and every time you update your native dependencies, run:
+---
 
-```sh
-bundle exec pod install
+## Project Structure
+
+```
+src/
+├── ai/
+│   ├── types.ts              ← All shared TypeScript interfaces
+│   ├── ModelRegistry.ts      ← Reads models.json manifest
+│   ├── ModelManager.ts       ← ⚠️ Critical: model lifecycle (load/unload)
+│   ├── ChatInference.ts      ← ⚠️ ONLY file that imports llama.rn
+│   └── utils/
+│       ├── promptBuilder.ts  ← ChatML prompt formatting + context trimming
+│       └── tokenStream.ts    ← Debounced token batching (80ms)
+│
+├── db/
+│   ├── client.ts             ← SQLite singleton + migration runner
+│   ├── schema.ts             ← All CREATE TABLE SQL + app_state keys
+│   └── repositories/
+│       ├── conversations.repo.ts
+│       ├── messages.repo.ts
+│       ├── models.repo.ts
+│       └── attachments.repo.ts
+│
+├── services/
+│   ├── chat.service.ts       ← Orchestrates chat flow
+│   ├── model.service.ts      ← Model download/activation facade
+│   └── storage.service.ts    ← File download, SHA256, path helpers
+│
+├── hooks/
+│   ├── useChat.ts            ← Chat state + send/stop for UI
+│   └── useModel.ts           ← Model state + download progress for UI
+│
+├── screens/
+│   ├── Chat/ChatScreen.tsx
+│   └── ModelSelect/ModelSelectScreen.tsx
+│
+├── components/
+│   ├── Chat/
+│   │   ├── MessageBubble.tsx
+│   │   ├── MessageList.tsx
+│   │   ├── InputBar.tsx
+│   │   └── StopButton.tsx
+│   └── Common/
+│       ├── ProgressBar.tsx
+│       └── Badge.tsx
+│
+└── config/
+    └── models.json           ← Model manifest (edit to add new models)
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+---
 
-```sh
-# Using npm
-npm run ios
+## How to Add a New Model to `models.json`
 
-# OR using Yarn
-yarn ios
+Edit `src/config/models.json` and add an entry to the `"models"` array:
+
+```json
+{
+  "id": "your-unique-model-id",
+  "name": "Human Readable Name",
+  "description": "Short description of the model",
+  "sizeBytes": 4100000000,
+  "url": "https://your-cdn.com/models/model.Q4_K_M.gguf",
+  "sha256": "the-real-sha256-hash-of-the-file",
+  "filename": "model.Q4_K_M.gguf",
+  "capabilities": { "vision": false },
+  "inferenceDefaults": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "max_tokens": 1024,
+    "context_length": 2048
+  }
+}
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+**Rules:**
+- `id` must be unique across all models
+- `filename` is used as the local file name on device
+- `sha256` must match the actual file (set to `"PLACEHOLDER_..."` only during development)
+- `vision: true` enables the attach button in the chat UI
+- Larger `context_length` values use more RAM
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+---
 
-## Step 3: Modify your app
+## Where Files Are Stored On Device
 
-Now that you have successfully run the app, let's make changes!
+```
+Android:
+/data/data/com.pocketai/files/
+├── models/
+│   └── tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+├── attachments/
+│   └── {messageId}/
+│       └── image.jpg
+└── pocketai.db   ← SQLite database
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+---
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Architecture Laws (Never Break)
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+```
+ChatScreen.tsx     → hooks only
+useChat.ts         → services only  
+chat.service.ts    → ChatInference, DB repos, StorageService
+ChatInference.ts   → llama.rn   ← ONLY FILE ALLOWED
+ModelManager.ts    → llama.rn, StorageService, DB repos
+```
 
-## Congratulations! :tada:
+**Verify compliance any time:**
+```bash
+grep -r "llama" src/screens src/hooks src/components
+# Should return ZERO results
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+---
 
-### Now what?
+## Running Tests
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+```bash
+# Unit tests (no device needed)
+npm test
 
-# Troubleshooting
+# Run specific test suites
+npx jest --testPathPattern="promptBuilder|tokenStream|ModelRegistry"
+```
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+---
 
-# Learn More
+## Running on Android
 
-To learn more about React Native, take a look at the following resources:
+```bash
+# Start Metro bundler
+npx react-native start
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+# In another terminal — launch on connected device/emulator
+npx react-native run-android
+```
+
+---
+
+## Device RAM Guidelines
+
+| Device RAM | Recommended Models |
+|---|---|
+| 2–3 GB | TinyLLaMA 1.1B Q4 |
+| 4–6 GB | Phi-2 2.7B Q4 |
+| 8 GB+ | Mistral 7B Q4 |
+
+---
+
+## V1 Checklist
+
+- [ ] App opens and shows splash screen
+- [ ] Model selection screen appears when no model is active
+- [ ] Model downloads with progress bar
+- [ ] SHA256 integrity check passes after download
+- [ ] Chat screen loads with active model badge
+- [ ] Message sends and response streams token by token
+- [ ] Stop button cancels generation mid-stream
+- [ ] App works in airplane mode (offline inference only)
+- [ ] Stable on 4GB RAM Android device
+- [ ] `grep -r "llama" src/screens src/hooks src/components` → zero results
